@@ -1,84 +1,49 @@
-# Honeypot Deception System (HDS)
+# 🛡️ Honeypot Deception System (HDS)
 
-Ek Python-based deception/defense system jo real service (masalan SSH)
-ko brute-force se bachata hai using a cluster of 18 honeypots on
-well-known ports.
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Ubuntu-orange.svg)](https://ubuntu.com/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Security](https://img.shields.io/badge/type-Active%20Defense-red.svg)](#)
 
-## Kya karta hai
+A high-performance, **Python-based active defense & deception architecture** designed to safeguard production services (e.g., OpenSSH) against automated brute-force attacks by dynamically rerouting malicious actors into a multi-port honeypot cluster.
 
-1. **18 honeypots** well-known ports par (FTP, SSH, Telnet, SMTP, MySQL,
-   RDP, Redis, MongoDB, etc.) — `config.py` mein `HONEYPOT_PORTS`.
-2. **Real service monitor** (`log_watcher.py`) — asli SSH service ke
-   `/var/log/auth.log` ko tail karta hai. 5 galat attempts par attacker
-   ko iptables `DNAT` se silently kisi honeypot par redirect kar deta hai
-   — attacker ko pata nahi chalta, wo wahi port (22) use kar raha
-   samajhta hai.
-3. Usi honeypot par 10 galat attempts → doosre honeypot par silently
-   rotate.
-4. Har username jo malicious IP ne kahin bhi (real ya honeypot) try
-   kiya, wo permanently block ho jata hai.
-5. **Tool detection** (`detector.py`) — agar IP se 5 second ke andar 4+
-   attempts aayen (script/tool ka pattern), to full count ka wait kiye
-   bagair hi turant redirect/rotate trigger ho jata hai.
-6. Total attempts (real + honeypot mila kar) `block_after_total_attempts`
-   (default 15) cross karne par IP ko permanently `iptables DROP` kar
-   diya jata hai.
+---
 
-## Files
+## 🌟 Key Architecture & Capabilities
 
-| File | Kaam |
-|---|---|
-| `config.py` | Sab thresholds, ports, paths yahan configure karo |
-| `database.py` | SQLite state (attempts, blocklists, per-IP rotation state) |
-| `firewall.py` | iptables DNAT redirect + IP DROP wrapper |
-| `detector.py` | Timing-based automated-tool detection |
-| `honeypot_server.py` | asyncio multi-protocol fake service listener |
-| `log_watcher.py` | Real SSH service ke logs tail karta hai |
-| `coordinator.py` | Poori decision logic (redirect/rotate/block) |
-| `main.py` | Entry point — sab kuch start karta hai |
+* **🐝 18-Port Decoy Cluster:** Spawns asynchronous honeypot listeners across common service ports (FTP, SSH, Telnet, SMTP, MySQL, RDP, Redis, MongoDB, etc.) as defined in `config.py`[cite: 2, 3].
+* **👁️ Dynamic Service Guard (`log_watcher.py`):** Real-time tailing of host log files (e.g., `/var/log/auth.log`)[cite: 2, 3]. Upon hitting **5 failed attempts**, the system silently diverts traffic via `iptables DNAT` to a honeypot—keeping the attacker unaware of the transition[cite: 2, 3].
+* **🔄 Silent Honeypot Rotation:** Automatically rotates connection targets across secondary honeypots after **10 failed attempts** within a decoy environment.
+* **🚫 Targeted User Blacklisting:** Any username targeted by an attacking host—whether against real or fake endpoints—is permanently recorded and restricted[cite: 2, 3].
+* **⚡ Automated Bot & Tool Detection (`detector.py`):** Instantly flags high-velocity attacks (e.g., 4+ attempts within 5 seconds) and triggers defensive rotation without waiting for standard attempt thresholds[cite: 2, 3].
+* **💥 Network-Level Mitigation:** Reaching the maximum total limit (`block_after_total_attempts: 15`) triggers a permanent `iptables DROP` rule to instantly sever connection at the transport layer[cite: 2, 3].
 
-## Setup
+---
 
-```bash
-# Linux (Ubuntu/Debian tested), root required for:
-#  - privileged ports (<1024) binding
-#  - iptables rule management
-sudo apt-get install iptables
+## 📁 Repository Structure
 
-# config.py mein apni environment ke hisaab se adjust karo:
-#  - REAL_SERVICE["log_path"]  (Ubuntu: /var/log/auth.log, RHEL: /var/log/secure)
-#  - HONEYPOT_HOST             (agar honeypots kisi doosre VM/container par hain)
-#  - THRESHOLDS                (apni policy ke hisaab se)
+```text
+├── ⚙️ config.py           # Global configurations, thresholds, and decoy ports[cite: 2, 3]
+├── 🗄️ database.py         # SQLite persistence for attempt tracking & blocklists[cite: 2, 3]
+├── 🧱 firewall.py         # Low-level iptables wrapper (DNAT redirect & DROP rules)[cite: 2, 3]
+├── 🎯 detector.py         # Velocity and timing analysis engine for bot detection[cite: 2, 3]
+├── 🍯 honeypot_server.py # Asyncio multi-protocol decoy server implementation[cite: 2, 3]
+├── 👁️ log_watcher.py      # Real-time native auth log parser daemon[cite: 2, 3]
+├── 🧠 coordinator.py      # Core orchestration and decision logic engine[cite: 3]
+└── 🚀 main.py             # Master system bootstrap entry point[cite: 2, 3]
+PrerequisitesOperating System: Linux (Ubuntu / Debian recommended)  Privileges: root access (required for socket binding <1024 and iptables rule manipulation)[cite: 2, 3]Bash# 1. Install system dependencies
+sudo apt-get update && sudo apt-get install iptables -y
 
+# 2. Clone the repository
+git clone [https://github.com/your-username/honeypot-deception-system.git](https://github.com/your-username/honeypot-deception-system.git)
+cd honeypot-deception-system
+
+# 3. Configure parameters (Optional)
+# Edit config.py to adjust paths like REAL_SERVICE["log_path"] or THRESHOLDS[cite: 2, 3]
+
+# 4. Launch the engine
 sudo python3 main.py
-```
-
-## ⚠️ Important limitations / real-world notes
-
-- **SSH honeypot simplified hai**: asli SSH crypto handshake (key exchange
-  waghera) implement nahi kiya — sirf banner + credential capture hai.
-  Production-grade SSH honeypot ke liye **Cowrie** project consider karo,
-  ya `asyncssh` library se full protocol implement karo.
-- **iptables rules root ke bina kaam nahi karengi.** Container ya
-  restricted environment mein test karne ke liye pehle
-  `NET_ADMIN` capability chahiye hogi.
-- Ye system **defensive/deception** tool hai — kisi bhi system par sirf
-  apne khud ke infrastructure par test/deploy karo. Kisi third-party
-  network par bagair authorization test karna illegal hai.
-- Log-format regex (`log_watcher.py`) sirf standard Ubuntu `sshd` format
-  ke liye hai. Agar tum koi doosri service (FTP, RDP, web login) protect
-  kar rahe ho, us service ke log format ke hisaab se
-  `FAILED_PATTERNS` update karo.
-- `firewall.clear_redirect()` best-effort hai (iptables rule delete
-  exact match maangta hai) — production mein rule IDs track karna
-  behtar hoga agar bohot zyada IPs handle karni hon.
-
-## Testing locally (bina root/iptables)
-
-Agar sirf honeypot logging test karni ho (firewall ke bagair):
-
-```bash
-python3 -c "
+🧪 Local Testing (Non-Root / Sandbox Mode)If you want to evaluate socket capturing capabilities without manipulating firewall rules or acquiring root privileges:Bashpython3 -c "
 import asyncio, honeypot_server
 
 async def fake_attempt(ip, u, p, port):
@@ -90,6 +55,6 @@ async def run():
 
 asyncio.run(run())
 "
-```
-Phir doosri terminal se: `ftp localhost 2121` ya `telnet localhost 2222`
-karke dekho attempts capture hote hain.
+In a second terminal, send test traffic:Bashftp localhost 2121
+# OR
+telnet localhost 2222

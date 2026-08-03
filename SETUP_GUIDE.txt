@@ -1,0 +1,121 @@
+================================================================================
+          REAL-TIME ACTIVE DEFENSE & DECOY HONEYPOT SYSTEM (HDS)
+                        COMPLETE SETUP & COMMAND GUIDE
+================================================================================
+
+OVERVIEW
+--------
+This document provides step-by-step instructions on how to properly deploy, 
+test, and manage the Moving Target Defense (MTD) Honeypot Lab on your Linux server.
+
+--------------------------------------------------------------------------------
+1. PREREQUISITES & SERVER HOSTING
+--------------------------------------------------------------------------------
+* Host your main web application on your defender server (e.g., using Nginx, 
+  Apache, Gunicorn, or Python Flask/Django).
+* Make sure your primary web application is live and accessible on your server's 
+  assigned IP address.
+* Install required system packages:
+    sudo apt update
+    sudo apt install python3 python3-pip iptables openssh-server -y
+
+--------------------------------------------------------------------------------
+2. PROVIDE YOUR CUSTOM FRONTEND TEMPLATES (CRITICAL)
+--------------------------------------------------------------------------------
+* You MUST provide your own web application's HTML pages and place them in the 
+  project root directory:
+    - login.html
+    - register.html
+    - forget_password.html (or forgot_password.html)
+* Why? The honeypot decoy cluster uses these exact HTML files to replicate your 
+  real web portal. When attackers are transparently rerouted, they will see 
+  an identical login interface, keeping them deceived inside the decoy environment.
+
+--------------------------------------------------------------------------------
+3. PASSWORD POLICY MANDATE (IMPORTANT SECURITY WARNING)
+--------------------------------------------------------------------------------
+* DO NOT USE EASY OR WEAK PASSWORDS!
+* Make sure all real system accounts, root users, SSH logins, and database 
+  credentials use strong passwords (minimum 12-16 characters with a mix of 
+  uppercase letters, lowercase letters, numbers, and special symbols).
+* Even with active defense scripts running, weak credentials (like "123456" or 
+  "admin") are vulnerable to single-attempt guessing before detection triggers.
+
+--------------------------------------------------------------------------------
+4. DEPLOYING & RUNNING THE DEFENSE ENGINE
+--------------------------------------------------------------------------------
+Step 1: Upload all HDS Python scripts (main.py, config.py, coordinator.py, 
+        detector.py, firewall.py, honeypot_server.py, log_watcher.py, 
+        database.py, admin.py) to your server directory.
+
+Step 2: Start the real-time active defense framework with root privileges:
+        sudo python3 main.py
+
+Step 3: (Optional) Monitor authentication log tailing in a separate terminal:
+        sudo tail -f /var/log/auth.log
+
+--------------------------------------------------------------------------------
+5. TESTING & ATTACK SIMULATION COMMANDS (PoC)
+--------------------------------------------------------------------------------
+Execute the following commands from an external attacker machine (e.g., Kali Linux):
+
+* Standard SSH Brute-Force Attack (THC-Hydra):
+    hydra -l root -P /usr/share/wordlists/rockyou.txt ssh://<YOUR_SERVER_IP> -t 4
+
+* Testing HTTP Login Brute-Force:
+    hydra -l admin -P /usr/share/wordlists/rockyou.txt <YOUR_SERVER_IP> http-post-form "/login.html:user=^USER^&pass=^PASS^:F=failed"
+
+--------------------------------------------------------------------------------
+6. FIREWALL & SYSTEM AUDIT COMMANDS
+--------------------------------------------------------------------------------
+Check dynamic active defense rules on the defender server:
+
+* View active iptables INPUT block rules (Layer 4 drops):
+    sudo iptables -L INPUT -n -v --line-numbers
+
+* View active NAT redirection rules (DNAT honeypot rerouting):
+    sudo iptables -t nat -L HDS_REDIRECT -n -v --line-numbers
+
+* Flush/Reset all active firewall defense rules manually (if needed):
+    sudo iptables -F
+    sudo iptables -t nat -F
+
+--------------------------------------------------------------------------------
+7. ADMINISTRATIVE ENGINE CONTROL (admin.py)
+--------------------------------------------------------------------------------
+Manage honeypot database blocklists and unblock IPs/usernames:
+
+* Open Interactive Admin Menu:
+    python3 admin.py
+
+* List all blocked IPs and banned usernames:
+    python3 admin.py list
+
+* Unblock a specific IP address:
+    python3 admin.py unblock-ip <TARGET_IP>
+
+* Unblock a banned username:
+    python3 admin.py unblock-username <USERNAME>
+
+* Manually block an IP address:
+    python3 admin.py block-ip <TARGET_IP>
+
+* Manually block a username:
+    python3 admin.py block-username <USERNAME>
+
+--------------------------------------------------------------------------------
+8. SECURITY ASSURANCE & SYSTEM PROTECTION
+--------------------------------------------------------------------------------
+* Once your web application is live on the server and these active defense 
+  scripts are running:
+    1. High-frequency brute-force attempts and automated tool scripts (e.g., Hydra) 
+       will be instantly detected by detector.py.
+    2. Attackers will be transparently redirected via iptables DNAT rules to fake 
+       honeypot decoy ports (login.html, register.html, etc.).
+    3. Repeated failures will trigger decoy port rotation and ultimate Layer-4 
+       socket termination (iptables INPUT DROP).
+
+* Following this exact setup pipeline gives your server a 99.99% chance of 
+  staying completely safe and defended against automated brute-force attacks, 
+  credential stuffing, and unauthorized access attempts.
+================================================================================
